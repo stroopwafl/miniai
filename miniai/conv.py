@@ -27,7 +27,7 @@ class ConvNormAct(nn.Sequential):
 class ResnetStem(nn.Sequential):
     def __init__(
         self,
-        stem_sizes: list # stem block channel sizes — [32, 32, 64] common
+        stem_sizes: list # stem block channel sizes — [img_channels, 32, 32, 64] common
     ):
         super().__init__(
             *[
