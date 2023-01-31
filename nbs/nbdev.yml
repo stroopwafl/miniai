@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "miniai"
+  site-url: "https://stroopwafl.github.io/miniai"
+  description: "Implementation of the miniai library from FastAI's part 2 course."
+  repo-branch: main
+  repo-url: "https://github.com/stroopwafl/miniai"
