@@ -24,25 +24,21 @@ class ConvNormAct(nn.Sequential):
         )
 
 # %% ../nbs/01_conv.ipynb 6
-class ResnetStem():
+class ResnetStem(nn.Sequential):
     def __init__(
         self,
-        stem_sizes
+        stem_sizes: list # stem block channel sizes — [32, 32, 64] common
     ):
-        self.conv1 = nn.Sequential(
-            [
+        super().__init__(
+            *[
                 ConvNormAct(
                     in_channels=stem_sizes[i],
                     out_channels=stem_sizes[i+1],
                     kernel_size=3,
                     stride=2 if i==0 else 1
                 )
-            for i in stem_sizes
-            ]
-        )
-            
-        super().init(
-            ConvNormAct(in_channels, out_channels, kernel_size=kernel_size, stride=stride),
+            for i in range(len(stem_sizes) - 1)
+            ],
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         )
 
@@ -55,29 +51,7 @@ class BottleneckBlock(nn.Module):
         reduction=4,
         stride=1
     ):
-        
-        reduced_features = out_channels // reduction
-        
-        self.block = nn.Sequential(
-            ConvNormAct(in_channels, reduced_features, kernel_size=1, stride=stride), # <----- including stride enables us to stride on this layer
-            ConvNormAct(reduced_features, reduced_features, kernel_size=3),
-            ConvNormAct(reduced_features, out_channels, kernel_size=1)
-        )
-        
-    def forward(self, x):
-        x = self.block(x)
-        return x
-
-# %% ../nbs/01_conv.ipynb 8
-class BottleneckBlock(nn.Module):
-    def __init__(
-        self,
-        in_channels,
-        out_channels,
-        reduction=4,
-        stride=1
-    ):
-        
+        super().__init__()
         reduced_features = out_channels // reduction
         
         self.block = nn.Sequential(
@@ -104,7 +78,7 @@ class BottleneckBlock(nn.Module):
         x += residual
         return x
 
-# %% ../nbs/01_conv.ipynb 9
+# %% ../nbs/01_conv.ipynb 8
 class ResnetStage(nn.Sequential):
     def __init__(
         self,
@@ -121,7 +95,7 @@ class ResnetStage(nn.Sequential):
             ]
         )
 
-# %% ../nbs/01_conv.ipynb 10
+# %% ../nbs/01_conv.ipynb 9
 class ResnetNN(nn.Module):
     def __init__(
         self,
@@ -131,6 +105,7 @@ class ResnetNN(nn.Module):
         depths,
         num_classes
     ):
+        super().__init__()
         stem_sizes = [img_channels, *stem_sizes]
         self.stem = ResnetStem(stem_sizes)
         
@@ -139,7 +114,7 @@ class ResnetNN(nn.Module):
                 ResnetStage(stem_sizes[-1], widths[0], depths[0], stride=1),
                 *[
                     ResnetStage(widths[i], widths[i+1], depths[i+1])
-                    for i in widths
+                    for i in range(len(widths) - 1)
                 ]
             ]   
         )
