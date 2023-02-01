@@ -46,6 +46,7 @@ class DataLoaders:
         cls, 
         dd, # Dataset dict object (works with hugging face datasets) 
         batch_size: int, # Batch size for the dataloader
-        as_tuple: bool=True # If true, returns a tuple of dataloaders like (train, valid)
+        as_tuple: bool=True, # If true, returns a tuple of dataloaders like (train, valid)
+        num_workers: int=4 # Number of CPUs used in parallel
     ):
-        return cls(*[DataLoader(ds, batch_size, num_workers=4, collate_fn=collate_dict(ds) if as_tuple else default_collate) for ds in dd.values()])
+        return cls(*[DataLoader(ds, batch_size, num_workers=num_workers, collate_fn=collate_dict(ds) if as_tuple else default_collate) for ds in dd.values()])

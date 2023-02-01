@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader, default_collate
 import torch.nn.functional as F
 
 from datasets import load_dataset, load_dataset_builder
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 import torchvision.transforms.functional as TF
 from fastcore.test import test_close
@@ -29,6 +29,8 @@ import pandas as pd
 from .conv import *
 from .datasets import *
 from nbdev.showdoc import *
+
+from fastprogress.fastprogress import master_bar, progress_bar
 
 # %% ../nbs/03_learner.ipynb 11
 class CancelFitException(Exception): pass
@@ -171,10 +173,10 @@ class ProgressCB(Callback):
         self.plot = plot
         if plot: self.losses, self.counter = [], 0
         
-    def before_fit(self): self.learn.epochs = tqdm(self.learn.epochs, total=self.learn.n_epochs)
+    def before_fit(self): self.learn.epochs = master_bar(self.learn.epochs, total=self.learn.n_epochs)
     
     def before_epoch(self):
-        self.learn.dl = tqdm(self.learn.dl, leave=False, total=len(self.learn.dl))
+        self.learn.dl = progress_bar(self.learn.dl, leave=False, total=len(self.learn.dl))
     def after_batch(self):
         if self.plot and self.learn.model.training:
             self.losses.append(float(self.learn.loss.detach()))
