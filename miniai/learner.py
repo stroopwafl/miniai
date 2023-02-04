@@ -97,6 +97,12 @@ class Learner:
             self.scheduler_step()
             self.zero_grad()
             
+    def lr_find(self):
+        lrf = LRFinderCB()
+        lrf.learn = self
+        self.cbs = self.cbs + [lrf]
+        self.fit(0.00001, 1, one_cycle=False)
+            
     def callback(self, name): 
         if self.cbs is not None:
             for cb in sorted(self.cbs, key=attrgetter('order')): 
