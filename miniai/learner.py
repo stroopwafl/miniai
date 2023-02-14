@@ -39,7 +39,7 @@ class CancelEpochException(Exception): pass
 class CancelFull_EpochException(Exception): pass
 
 # %% ../nbs/03_learner.ipynb 13
-from torch.optim.lr_scheduler import OneCycleLR
+from torch.optim import lr_scheduler
 
 # %% ../nbs/03_learner.ipynb 14
 class Learner:
@@ -53,6 +53,7 @@ class Learner:
         dls, # Dataloaders object, expected as a tuple of (train, valid)
         model, # Model used for training
         opt_func=optim.SGD, # Optimisation function for optimising parameters after backprop, defaults to SGD
+        scheduler=None, # Scheduler for adjusting the learning rate. Default 1Cycle
         loss_func=F.cross_entropy, # Loss function used, defaults to cross entropy
         cbs: list=None # Optional list of callback functions called via context manager
     ):
@@ -68,9 +69,12 @@ class Learner:
             self.callback(f"after_{name}")
         except globals()[f'Cancel{name.title()}Exception']: pass
         
-    def fit(self, lr, epochs, one_cycle=False):
-        self.lr, self.n_epochs, self.epochs, self.one_cycle  = lr, epochs, range(epochs), one_cycle
+    def fit(self, lr, epochs, lr_find=False):
+        self.lr, self.n_epochs, self.epochs = lr, epochs, range(epochs)
         self.opt = self.opt_func(self.model.parameters(), self.lr)
+        if self.scheduler is not None and not lr_find: 
+            self.cbs = self.cbs + [self.scheduler]
+            for cb in self.cbs: cb.learn = self
         with self.callback_context('fit'):
             for self.epoch in self.epochs:
                 with self.callback_context('full_epoch'):
@@ -81,7 +85,6 @@ class Learner:
         self.model.training = train
         if train: self.dl = self.dls.train
         else: self.dl = self.dls.valid
-        if self.one_cycle: self.scheduler = OneCycleLR(self.opt, max_lr=self.lr*1.3, total_steps=len(self.dl))
         with self.callback_context('epoch'):
             for self.batch in self.dl:
                 with self.callback_context('batch'):
@@ -94,14 +97,14 @@ class Learner:
         if self.model.training:
             self.backward()
             self.step()
-            self.scheduler_step()
             self.zero_grad()
             
-    def lr_find(self):
-        lrf = LRFinderCB()
+    def lr_find(self, lr_start=0.00001, gamma=1.3):
+        lrf = LRFinderCB(gamma)
         lrf.learn = self
         self.cbs = self.cbs + [lrf]
-        self.fit(0.00001, 1, one_cycle=False)
+        self.fit(lr_start, 1, lr_find=True)
+        del(self.cbs[-1])
             
     def callback(self, name): 
         if self.cbs is not None:
@@ -144,7 +147,8 @@ class MetricsCB(Callback):
     def _log(self): 
         print(self.log)
     
-    def before_fit(self): self.learn.metrics = self
+    def before_fit(self):
+        self.learn.metrics = self
     def before_full_epoch(self):
         self.log = pd.DataFrame({
             "Train loss": 0,
@@ -225,15 +229,12 @@ class DeviceCB(Callback):
 class BaseLearner(Learner):
     """
         Flexible training subclass that handles key training functionality
-        for each batch, and enables training functionality to be substituted. 
-        Uses an optional scheduler for one cycle training if desired.
+        for each batch.
     """
     def predict(self): self.preds = self.model(self.xb)
     def get_loss(self): self.loss = self.loss_func(self.preds, self.yb)
     def backward(self): self.loss.backward()
     def step(self): self.opt.step()
-    def scheduler_step(self): 
-        if self.one_cycle: self.scheduler.step()
     def zero_grad(self): self.opt.zero_grad()
 
 # %% ../nbs/03_learner.ipynb 29

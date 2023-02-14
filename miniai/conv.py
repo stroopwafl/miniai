@@ -8,10 +8,10 @@ from torch import nn
 from fastcore import docments
 
 # %% ../nbs/02_conv.ipynb 5
-class ConvNormAct(nn.Sequential):
+class ConvNormAct(nn.Module):
     """
-        Sequential block containing a convolutional layer, followed by batch 
-        normalisation and a ReLU activation. It is the basic component of
+        Sequential block containing a convolutional layer, followed by a 
+        normalisation layer and a ReLU activation. It is the basic component of
         convolutional neural networks.
     """
     def __init__(
@@ -21,13 +21,20 @@ class ConvNormAct(nn.Sequential):
         kernel_size=3, # Size of square kernel used for convolution (3 represents a square of 3x3 pixels)
         bias=True, # If true, a bias parameter is automatically included
         stride=2, # Size of stride
-        act=True # Include activation. If true, activation defaults to ReLU
+        norm=nn.BatchNorm2d, # type of normalisation applied, default BatchNorm2d. If "None", no normalisation is applied.
+        act=nn.ReLU, # Activation function. If "None", no activation function is applied.
+        zero_norm_weights=False
     ):
-        super().__init__(
-            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=kernel_size//2, bias=bias),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU() if act else None
+        super().__init__()
+        conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=kernel_size//2, bias=bias)
+        if zero_norm_weights: nn.init.constant_(conv.weight, 0.)
+        self.block = nn.Sequential(
+            conv,
+            norm(out_channels) if norm is not None else nn.Identity(),
+            act() if act is not None else nn.Identity()
         )
+        
+    def forward(self, x): return self.block(x)
 
 # %% ../nbs/02_conv.ipynb 7
 class ResnetStem(nn.Sequential):
