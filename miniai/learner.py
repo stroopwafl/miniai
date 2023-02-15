@@ -53,11 +53,12 @@ class Learner:
         dls, # Dataloaders object, expected as a tuple of (train, valid)
         model, # Model used for training
         opt_func=optim.SGD, # Optimisation function for optimising parameters after backprop, defaults to SGD
-        scheduler=None, # Scheduler for adjusting the learning rate. Default 1Cycle
+        scheduler=None, # Scheduler for adjusting the learning rate
         loss_func=F.cross_entropy, # Loss function used, defaults to cross entropy
         cbs: list=None # Optional list of callback functions called via context manager
     ):
         fc.store_attr()
+        cbs += [LRScheduler]
         if cbs is not None:
             for cb in cbs: cb.learn = self
         
@@ -73,8 +74,8 @@ class Learner:
         self.lr, self.n_epochs, self.epochs = lr, epochs, range(epochs)
         self.opt = self.opt_func(self.model.parameters(), self.lr)
         if self.scheduler is not None and not lr_find: 
+            self.scheduler.learn = self
             self.cbs = self.cbs + [self.scheduler]
-            for cb in self.cbs: cb.learn = self
         with self.callback_context('fit'):
             for self.epoch in self.epochs:
                 with self.callback_context('full_epoch'):
@@ -146,7 +147,6 @@ class MetricsCB(Callback):
         
     def _log(self): 
         print(self.log)
-    
     def before_fit(self):
         self.learn.metrics = self
     def before_full_epoch(self):
