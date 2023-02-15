@@ -58,7 +58,6 @@ class Learner:
         cbs: list=None # Optional list of callback functions called via context manager
     ):
         fc.store_attr()
-        cbs += [LRScheduler]
         if cbs is not None:
             for cb in cbs: cb.learn = self
         
