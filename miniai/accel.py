@@ -30,7 +30,7 @@ torch.set_printoptions(precision=2, linewidth=140, sci_mode=False)
 torch.manual_seed(1)
 
 # %% auto 0
-__all__ = ['set_seed', 'LRScheduler', 'SingleBatch']
+__all__ = ['set_seed', 'SGD', 'Adam', 'LRScheduler', 'SingleBatch', 'LinearAnneal', 'CosineAnneal', 'ExponentialAnneal']
 
 # %% ../nbs/06_accel_sgd.ipynb 4
 def set_seed(seed, deterministic=False):
@@ -38,6 +38,41 @@ def set_seed(seed, deterministic=False):
     torch.manual_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
+
+# %% ../nbs/06_accel_sgd.ipynb 27
+class SGD:
+    def __init__(self, params, lr, wd=0.):
+        params = list(params)
+        fc.store_attr()
+        
+    def step(self):
+        with torch.no_grad():
+            for p in self.params: 
+                self.reg_step(p)
+                self.opt_step(p)
+    
+    def reg_step(self, p): 
+        if self.wd !=0: p *= 1 - self.lr*self.wd
+    def opt_step(self, p): p -= p.grad * self.lr
+    def zero_grad(self):
+        for p in self.params: p.grad.data.zero_()
+
+# %% ../nbs/06_accel_sgd.ipynb 28
+class Adam(SGD):
+    def __init__(self, params, lr, beta1=0.9, beta2=0.999, epsilon=1e-5, wd=0.):
+        super().__init__(params, lr, wd)
+        self.beta1, self.beta2, self.epsilon, self.i = beta1, beta2, epsilon, 0
+        
+    def opt_step(self, p):
+        if not hasattr(p, 'avg'): p.avg = torch.zeros_like(p.grad.data)
+        if not hasattr(p, 'sqr_avg'): p.sqr_avg = torch.zeros_like(p.grad.data)
+        if not hasattr(p, 'unbiased_sqr_avg'): p.unbiased_sqr_avg = torch.zeros_like(p.grad.data)
+        p.avg = (self.beta1 * p.avg) + ((1-self.beta1) * p.grad)
+        p.sqr_avg = (self.beta2 * p.sqr_avg) + ((1-self.beta2) * p.grad**2)
+        unbiased_avg = p.avg / (1 - (self.beta1**(self.i+1)))
+        p.unbiased_sqr_avg = p.sqr_avg / (1 - (self.beta2**(self.i+1)))
+        p -= (self.lr * unbiased_avg) / (p.unbiased_sqr_avg + self.epsilon).sqrt()
+        self.i += 1
 
 # %% ../nbs/06_accel_sgd.ipynb 35
 class LRScheduler(Callback):
@@ -47,6 +82,7 @@ class LRScheduler(Callback):
         self.sched = sched
     def before_fit(self): 
         self.schedo = self.sched(self.learn.opt)
+        self.schedo.learn = self.learn
     def after_batch(self): 
         if self.learn.model.training: self.schedo.step()
 
@@ -54,3 +90,25 @@ class LRScheduler(Callback):
 class SingleBatch(Callback):
     def __init__(self): super().__init__()
     def after_batch(self): raise CancelFitException()
+
+# %% ../nbs/06_accel_sgd.ipynb 59
+class _LRSched:
+    def __init__(self, optimiser, total_steps):
+        fc.store_attr()
+        self.max_lr = self.optimiser.param_groups[0]['lr']
+        self.current_step = 0
+        self.lrs, self.moms = [], []
+    
+    def step(self):
+        lr, mom = self.get_lr(), self.get_mom()
+        for group in self.optimiser.param_groups:
+            beta1, beta2 = group['betas']
+            group['lr'] = lr
+            group['betas'] = (s)
+        self.current_step += 1
+        self.lrs.append(lr)
+
+# %% ../nbs/06_accel_sgd.ipynb 61
+def LinearAnneal(base, add, current_step): return base + (current_step*add)
+def CosineAnneal(start, end, current_step, total_steps): return end + (0.5*(start-end) * (1 + math.cos((current_step / total_steps) * math.pi)))
+def ExponentialAnneal(base, gamma, current_step): return base*gamma**(current_step-1)

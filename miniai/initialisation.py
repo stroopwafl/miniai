@@ -76,8 +76,10 @@ def normalise_batch(b):
 
 # %% ../nbs/05_initialisation.ipynb 32
 class BatchTransform(Callback):
-    def __init__(self, f): self.func = f
-    def before_batch(self): self.learn.batch = self.func(self.learn.batch)
+    def __init__(self, func, on_train=True, on_val=False): fc.store_attr()
+    def before_batch(self): 
+        if (self.on_train and self.learn.model.training) or (self.on_val and not self.learn.model.training):
+            self.learn.batch = self.func(self.learn.batch)
 
 # %% ../nbs/05_initialisation.ipynb 37
 class LayerNorm(nn.Module):
